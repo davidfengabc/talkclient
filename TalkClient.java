@@ -85,10 +85,9 @@ public class TalkClient {
     BufferedReader stdIn = new BufferedReader(
 	new InputStreamReader(System.in));
 
-    XMLEventWriter writer = openXMLOut(soc);
-    XMLEventFactory eventFac = XMLEventFactory.newInstance();
+    XMLStreamWriter writer = openXMLOut(soc);
 
-    initStream(writer, eventFac, "gmail.com");
+    initStream(writer, "gmail.com");
     //System.out.println("Sending init xml\n");
     //out.print(xml_init);
     //out.flush();
@@ -136,13 +135,13 @@ public class TalkClient {
     soc.close();
   }
 
-  private static XMLEventWriter openXMLOut(Socket soc) {
-    XMLEventWriter writer = null;
+  private static XMLStreamWriter openXMLOut(Socket soc) {
+    XMLStreamWriter writer = null;
     XMLOutputFactory output = null;
     try{
       output = XMLOutputFactory.newInstance();
       //XMLEventWriter writer = output.createXMLEventWriter(soc.getOutputStream());
-      writer = output.createXMLEventWriter(System.out);
+      writer = output.createXMLStreamWriter(System.out);
     } catch (Exception e) {
       System.out.println("Error openXMLOut");
       System.exit(1);
@@ -150,61 +149,14 @@ public class TalkClient {
     return writer;
   }
 
-  private static void initStream(XMLEventWriter writer, XMLEventFactory evtFac, String to) throws Exception {
-    ArrayList<Attribute> attr = new ArrayList<Attribute>();
-    ArrayList<Namespace> ns = new ArrayList<Namespace>();;
-    Namespace defaultNs = evtFac.createNamespace("jabber:client");
-    Namespace streamNs = evtFac.createNamespace("stream","http://etherx.jabber.org/streams");
-    attr.add(evtFac.createAttribute(new QName("to"),"gmail.com"));
-    attr.add(evtFac.createAttribute(new QName("version"),"1.0"));
-    writer.add(evtFac.createStartElement(defaultNs.getPrefix(), defaultNs.getNamespaceURI(),"stream", attr.iterator(), ns.iterator()));
+  private static void initStream(XMLStreamWriter writer, String to) throws Exception {
+    writer.writeStartDocument();
+    writer.writeStartElement("stream", "stream", "http://etherx.jabber.org/streams");
+    writer.writeDefaultNamespace("jabber:client");
+    writer.writeNamespace("stream","http://etherx.jabber.org/streams");
+    writer.writeAttribute("to",to);
+    writer.writeAttribute("version","1.0");
+    writer.writeCharacters("");
     writer.flush();
-
-    
   }
-
-//  private static char[] base64(char[] PW) {
-//    int sixth1;
-//    int sixth2;
-//    int sixth3;
-//    int sixth4;
-//    int thirds = PW.length/3;
-//    int lastthird = PW.length%3;
-//    char[] encodedPW = new char[(thirds+mod[lastthird])*4];
-//    int i=0;
-//
-//    for(i=0; i < thirds; i++) {
-//      sixth1 = (PW[i*3] & (0xfc)) >> 2;
-//      sixth2 = ((PW[i*3] & (0x3)) << 4) + ((PW[i*3+1] & (0xf0)) >> 4);
-//      sixth3 = ((PW[i*3+1] & (0xf)) << 2) + ((PW[i*3+2] & (0xc0)) >> 6);
-//      sixth4 = PW[i*3+2] & (0x3f);
-//
-//      encodedPW[i*4] = BASE64EN[sixth1];
-//      encodedPW[i*4+1] = BASE64EN[sixth2];
-//      encodedPW[i*4+2] = BASE64EN[sixth3];
-//      encodedPW[i*4+3] = BASE64EN[sixth4];
-//    }
-//
-//    if(lastthird == 1) {
-//      sixth1 = (PW[i*3] & (0xfc)) >> 2;
-//      sixth2 = (PW[i*3] & (0x3)) << 4;
-//
-//      encodedPW[i*4] = BASE64EN[sixth1];
-//      encodedPW[i*4+1] = BASE64EN[sixth2];
-//      encodedPW[i*4+2] = '=';
-//      encodedPW[i*4+3] = '=';
-//    } else if (lastthird == 2) {
-//      sixth1 = (PW[i*3] & (0xfc)) >> 2;
-//      sixth2 = ((PW[i*3] & (0x3)) << 4) + ((PW[i*3+1] & (0xf0)) >> 4);
-//      sixth3 = (PW[i*3+1] & (0xf)) << 2;
-//
-//      encodedPW[i*4] = BASE64EN[sixth1];
-//      encodedPW[i*4+1] = BASE64EN[sixth2];
-//      encodedPW[i*4+2] = BASE64EN[sixth3];
-//      encodedPW[i*4+3] = '=';
-//    }
-//
-//    return encodedPW;
-//  }
-
 }
