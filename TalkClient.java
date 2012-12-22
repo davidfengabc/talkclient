@@ -1,8 +1,11 @@
 import java.io.*;
-import java.util.Arrays;
+import java.util.*;
 import java.net.*;
 import javax.net.ssl.*;
 import tools.base64encode;
+import javax.xml.namespace.*;
+import javax.xml.stream.*;
+import javax.xml.stream.events.*;
 
 public class TalkClient {
   public static final String server = "talk.google.com";
@@ -17,6 +20,7 @@ public class TalkClient {
 
   public static final char BASE64EN[] = {'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z','0','1','2','3','4','5','6','7','8','9','+','/'};
   public static final int mod[] = {0,1,1};
+
 
 
   private static String collectXMLUntil(BufferedReader in, String match) {
@@ -40,7 +44,7 @@ public class TalkClient {
 
     char[] nextRead = new char[READ_LENGTH];
     int charsRead = 0;
-    Socket echoSocket = null;
+    Socket soc = null;
     PrintWriter out = null;
     BufferedReader in = null;
 
@@ -66,10 +70,9 @@ public class TalkClient {
 
 
     try {
-      echoSocket = new Socket(server, port);
-      out = new PrintWriter(echoSocket.getOutputStream(), true);
+      soc = new Socket(server, port);
       in = new BufferedReader(new InputStreamReader(
-	    echoSocket.getInputStream()));
+	    soc.getInputStream()));
     } catch (UnknownHostException e) {
       System.err.println("Don't know about host: " + server);
       System.exit(1);
@@ -82,10 +85,14 @@ public class TalkClient {
     BufferedReader stdIn = new BufferedReader(
 	new InputStreamReader(System.in));
 
-    System.out.println("Sending init xml\n");
-    out.print(xml_init);
-    out.flush();
-    System.out.println(collectXMLUntil(in, "</stream:features>"));
+    XMLEventWriter writer = openXMLOut(soc);
+    XMLEventFactory eventFac = XMLEventFactory.newInstance();
+
+    initStream(writer, eventFac, "gmail.com");
+    //System.out.println("Sending init xml\n");
+    //out.print(xml_init);
+    //out.flush();
+    //System.out.println(collectXMLUntil(in, "</stream:features>"));
 
     System.out.println("Sending starttls xml\n");
     out.print(xml_starttls);
@@ -95,7 +102,7 @@ public class TalkClient {
 
     SSLContext sslCtxt = SSLContext.getDefault();
     SSLSocketFactory sslSF = sslCtxt.getSocketFactory();
-    SSLSocket sslSoc = (SSLSocket) sslSF.createSocket(echoSocket,server,echoSocket.getPort(),true);
+    SSLSocket sslSoc = (SSLSocket) sslSF.createSocket(soc,server,soc.getPort(),true);
     sslSoc.setUseClientMode(true);
 
     PrintWriter sslout = null;
@@ -126,7 +133,34 @@ public class TalkClient {
     sslout.close();
     stdIn.close();
     sslSoc.close();
-    echoSocket.close();
+    soc.close();
+  }
+
+  private static XMLEventWriter openXMLOut(Socket soc) {
+    XMLEventWriter writer = null;
+    XMLOutputFactory output = null;
+    try{
+      output = XMLOutputFactory.newInstance();
+      //XMLEventWriter writer = output.createXMLEventWriter(soc.getOutputStream());
+      writer = output.createXMLEventWriter(System.out);
+    } catch (Exception e) {
+      System.out.println("Error openXMLOut");
+      System.exit(1);
+    }
+    return writer;
+  }
+
+  private static void initStream(XMLEventWriter writer, XMLEventFactory evtFac, String to) throws Exception {
+    ArrayList<Attribute> attr = new ArrayList<Attribute>();
+    ArrayList<Namespace> ns = new ArrayList<Namespace>();;
+    Namespace defaultNs = evtFac.createNamespace("jabber:client");
+    Namespace streamNs = evtFac.createNamespace("stream","http://etherx.jabber.org/streams");
+    attr.add(evtFac.createAttribute(new QName("to"),"gmail.com"));
+    attr.add(evtFac.createAttribute(new QName("version"),"1.0"));
+    writer.add(evtFac.createStartElement(defaultNs.getPrefix(), defaultNs.getNamespaceURI(),"stream", attr.iterator(), ns.iterator()));
+    writer.flush();
+
+    
   }
 
 //  private static char[] base64(char[] PW) {
