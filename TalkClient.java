@@ -23,13 +23,14 @@ public class TalkClient {
 
 
 
-  private static String collectXMLUntil(BufferedReader in, String match) {
+  private static void collectXMLUntil(BufferedReader in, String match) {
     String string = "";
     System.out.println("Reading\n");
     char ch;
     try {
       while(true) {
 	ch = (char) in.read();
+	System.out.print(ch);
 	string = string + ch;
 	if (ch == '>' && string.contains(match))
 	  break;
@@ -37,7 +38,7 @@ public class TalkClient {
     } catch (IOException e) {
       System.err.println("in.read() failed: " + e.getMessage());
     }
-    return string;
+    //return string;
   }
 
   public static void main(String[] args) throws Exception {
@@ -88,15 +89,16 @@ public class TalkClient {
     XMLStreamWriter writer = openXMLOut(soc);
 
     initStream(writer, "gmail.com");
-    //System.out.println("Sending init xml\n");
+    System.out.println("Sending init xml\n");
     //out.print(xml_init);
     //out.flush();
-    //System.out.println(collectXMLUntil(in, "</stream:features>"));
+    collectXMLUntil(in, "</stream:features>");
 
     System.out.println("Sending starttls xml\n");
-    out.print(xml_starttls);
-    out.flush();
-    System.out.println(collectXMLUntil(in, "/>"));
+//    out.print(xml_starttls);
+ //   out.flush();
+    startTLS(writer);
+    collectXMLUntil(in, "/>");
 
 
     SSLContext sslCtxt = SSLContext.getDefault();
@@ -109,12 +111,14 @@ public class TalkClient {
     sslout = new PrintWriter(sslSoc.getOutputStream(), true);
     sslin = new BufferedReader(new InputStreamReader(
 	  sslSoc.getInputStream()));
+    XMLStreamWriter sslWriter = openXMLOut(sslSoc);
 
     System.out.println("Sending init xml tls\n");
     sslout.print(xml_init);
     sslout.flush();
-    System.out.println(collectXMLUntil(sslin, "</stream:features>"));
+    collectXMLUntil(sslin, "</stream:features>");
 
+    //SASL auth XMPP 6.4
     System.out.println("Sending sasl auth\n");
     sslout.print(xml_saslauth);
     for(int i=0; i<encodedPW.length; i++) {
@@ -123,7 +127,13 @@ public class TalkClient {
     Arrays.fill(encodedPW,' ');
     sslout.print("</auth>");
     sslout.flush();
-    System.out.println(collectXMLUntil(sslin, "/>"));
+    collectXMLUntil(sslin, "/>");
+
+    //Initiate new stream after SASL success XMPP 6.4.6
+    initStream(sslWriter, "gmail.com");
+    collectXMLUntil(sslin, "</stream:features>");
+
+
 
     sslout.println(xml_endstream);
     sslout.flush();
@@ -140,8 +150,9 @@ public class TalkClient {
     XMLOutputFactory output = null;
     try{
       output = XMLOutputFactory.newInstance();
-      //XMLEventWriter writer = output.createXMLEventWriter(soc.getOutputStream());
-      writer = output.createXMLStreamWriter(System.out);
+      writer = output.createXMLStreamWriter(soc.getOutputStream());
+      //writer = output.createXMLStreamWriter(System.out);
+      writer.writeStartDocument();
     } catch (Exception e) {
       System.out.println("Error openXMLOut");
       System.exit(1);
@@ -150,12 +161,18 @@ public class TalkClient {
   }
 
   private static void initStream(XMLStreamWriter writer, String to) throws Exception {
-    writer.writeStartDocument();
     writer.writeStartElement("stream", "stream", "http://etherx.jabber.org/streams");
     writer.writeDefaultNamespace("jabber:client");
     writer.writeNamespace("stream","http://etherx.jabber.org/streams");
     writer.writeAttribute("to",to);
     writer.writeAttribute("version","1.0");
+    writer.writeCharacters("");
+    writer.flush();
+  }
+
+  private static void startTLS(XMLStreamWriter writer) throws Exception {
+    writer.writeEmptyElement("starttls");
+    writer.writeDefaultNamespace("urn:ietf:params:xml:ns:xmpp-tls");
     writer.writeCharacters("");
     writer.flush();
   }
