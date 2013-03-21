@@ -133,6 +133,9 @@ public class TalkClient {
     initStream(sslWriter, "gmail.com");
     collectXMLUntil(sslin, "</stream:features>");
 
+    //Resource binding XMPP 7
+    bindResource(sslWriter);
+    collectXMLUntil(sslin, "</iq>");
 
 
     sslout.println(xml_endstream);
@@ -175,5 +178,21 @@ public class TalkClient {
     writer.writeDefaultNamespace("urn:ietf:params:xml:ns:xmpp-tls");
     writer.writeCharacters("");
     writer.flush();
+  }
+  
+
+  private static void bindResource(XMLStreamWriter writer) throws Exception {
+    writer.writeStartElement("iq");
+    writer.writeAttribute("id","1");
+    writer.writeAttribute("type","set");
+    
+    writer.writeEmptyElement("bind");
+    writer.writeDefaultNamespace("urn:ietf:params:xml:ns:xmpp-bind");
+    writer.writeCharacters("");
+
+    writer.writeEndElement();
+
+    writer.flush();
+
   }
 }
