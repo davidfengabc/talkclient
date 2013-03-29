@@ -41,6 +41,99 @@ public class TalkClient {
     //return string;
   }
 
+  
+  private static void startDoc(XMLStreamReader reader) throws Exception {
+    if(reader.getEventType() == XMLStreamReader.START_DOCUMENT) {
+      System.out.println("start doc found yay");
+    } else {
+      System.err.println("start doc not foudn.....");
+      System.exit(1);
+    }
+  }
+
+  private static void initStream(XMLStreamReader reader) throws Exception {
+    if(reader.next() != XMLStreamReader.START_ELEMENT){
+      throw new XMLStreamException("must be <stream:stream>");
+    }
+    if(reader.getLocalName() != "stream") {
+      throw new XMLStreamException("must be <stream:stream>");
+    }
+    while((reader.next() != XMLStreamReader.END_ELEMENT) ||
+      reader.getLocalName() != "features")
+    {
+      debugXML(reader);
+    }
+  }
+
+
+  private static void debugXML(XMLStreamReader reader) throws Exception{
+    //if(reader.getEventType() == XMLStreamReader.START_DOCUMENT) {
+      //System.out.println("start doc found yay");
+    //} else {
+      //System.err.println("start doc not foudn.....");
+      //System.exit(1);
+    //}
+    //while (reader.hasNext()) {
+      switch(reader.getEventType()) {
+	case XMLStreamReader.ATTRIBUTE:
+	   System.out.println("attribute");
+	   for(int i=0; i<reader.getAttributeCount(); i++) {
+	     System.out.println("localname=" + reader.getAttributeName(i) + " getAttributeNamespace=" + reader.getAttributeNamespace(i) + " getAttributePrefix=" + reader.getAttributePrefix(i) + " getAttributeType" + reader.getAttributeType(i) + " getAttributeValue" + reader.getAttributeValue(i));
+	   }
+	   break;
+	case XMLStreamReader.CDATA:
+	   System.out.println("cdata");
+	   break;
+	case XMLStreamReader.CHARACTERS:
+	   System.out.println("characters");
+	   break;
+	case XMLStreamReader.COMMENT:
+	   System.out.println("comment");
+	   break;
+	case XMLStreamReader.DTD:
+	   System.out.println("dtd");
+	   break;
+	case XMLStreamReader.END_DOCUMENT:
+	   System.out.println("end document");
+	   break;
+	case XMLStreamReader.END_ELEMENT:
+	   System.out.println("end element - " + reader.getPrefix() + ":" + reader.getLocalName());
+	   break;
+	case XMLStreamReader.ENTITY_DECLARATION:
+	   System.out.println("entity declaration");
+	   break;
+	case XMLStreamReader.ENTITY_REFERENCE:
+	   System.out.println("entity reference");
+	   break;
+	case XMLStreamReader.NAMESPACE:
+	   System.out.println("namespace");
+	   break;
+	case XMLStreamReader.NOTATION_DECLARATION:
+	   System.out.println("notation declaration");
+	   break;
+	case XMLStreamReader.PROCESSING_INSTRUCTION:
+	   System.out.println("processing instruciton");
+	   break;
+	case XMLStreamReader.SPACE:
+	   System.out.println("space");
+	   break;
+	case XMLStreamReader.START_DOCUMENT:
+	   System.out.println("start doc");
+	   break;
+	case XMLStreamReader.START_ELEMENT:
+	   System.out.println("start element - " + reader.getPrefix() + ":" + reader.getLocalName());
+	   for(int i=0; i<reader.getAttributeCount(); i++) {
+	     System.out.println("localname=" + reader.getAttributeName(i) + " getAttributeNamespace=" + reader.getAttributeNamespace(i) + " getAttributePrefix=" + reader.getAttributePrefix(i) + " getAttributeType" + reader.getAttributeType(i) + " getAttributeValue" + reader.getAttributeValue(i));
+	   }
+	   break;
+	default:
+	   System.out.println("error:default");
+	   break;
+	   
+      }
+  }
+
+
   public static void main(String[] args) throws Exception {
 
     char[] nextRead = new char[READ_LENGTH];
@@ -72,8 +165,8 @@ public class TalkClient {
 
     try {
       soc = new Socket(server, port);
-      in = new BufferedReader(new InputStreamReader(
-	    soc.getInputStream()));
+      //in = new BufferedReader(new InputStreamReader(
+//	    soc.getInputStream()));
     } catch (UnknownHostException e) {
       System.err.println("Don't know about host: " + server);
       System.exit(1);
@@ -87,18 +180,23 @@ public class TalkClient {
 	new InputStreamReader(System.in));
 
     XMLStreamWriter writer = openXMLOut(soc);
+    System.out.println("opening reader");
+    System.out.println("opened reader");
 
-    initStream(writer, "gmail.com");
     System.out.println("Sending init xml\n");
     //out.print(xml_init);
     //out.flush();
-    collectXMLUntil(in, "</stream:features>");
+    //collectXMLUntil(in, "</stream:features>");
+    initStream(writer);
+    XMLStreamReader reader = openXMLIn(soc);
+    startDoc(reader);
+    initStream(reader);
+
 
     System.out.println("Sending starttls xml\n");
-//    out.print(xml_starttls);
- //   out.flush();
-    startTLS(writer);
-    collectXMLUntil(in, "/>");
+    startTLS(writer, reader);
+
+    //reinitialize stream
 
 
     SSLContext sslCtxt = SSLContext.getDefault();
@@ -114,9 +212,13 @@ public class TalkClient {
     XMLStreamWriter sslWriter = openXMLOut(sslSoc);
 
     System.out.println("Sending init xml tls\n");
-    sslout.print(xml_init);
-    sslout.flush();
-    collectXMLUntil(sslin, "</stream:features>");
+    initStream(sslWriter);
+    //sslout.print(xml_init);
+    //sslout.flush();
+    //collectXMLUntil(sslin, "</stream:features>");
+    XMLStreamReader sslReader = openXMLIn(sslSoc);
+    initStream(sslReader);
+    
 
     //SASL auth XMPP 6.4
     System.out.println("Sending sasl auth\n");
@@ -130,8 +232,9 @@ public class TalkClient {
     collectXMLUntil(sslin, "/>");
 
     //Initiate new stream after SASL success XMPP 6.4.6
-    initStream(sslWriter, "gmail.com");
-    collectXMLUntil(sslin, "</stream:features>");
+    initStream(sslWriter);
+    initStream(sslReader);
+    //collectXMLUntil(sslin, "</stream:features>");
 
     //Resource binding XMPP 7
     bindResource(sslWriter);
@@ -163,21 +266,49 @@ public class TalkClient {
     return writer;
   }
 
-  private static void initStream(XMLStreamWriter writer, String to) throws Exception {
+  private static XMLStreamReader openXMLIn(Socket soc) {
+    XMLStreamReader reader = null;
+    XMLInputFactory input = null;
+    try{
+      System.out.println("new fact");
+      input = XMLInputFactory.newInstance();
+      System.out.println("getInputStream");
+      reader = input.createXMLStreamReader(soc.getInputStream());
+    } catch (Exception e) {
+      System.out.println("Error openXMLIn");
+      System.exit(1);
+    }
+    return reader;
+  }
+
+  private static void initStream(XMLStreamWriter writer) throws Exception {
     writer.writeStartElement("stream", "stream", "http://etherx.jabber.org/streams");
     writer.writeDefaultNamespace("jabber:client");
     writer.writeNamespace("stream","http://etherx.jabber.org/streams");
-    writer.writeAttribute("to",to);
+    writer.writeAttribute("to","gmail.com");
     writer.writeAttribute("version","1.0");
     writer.writeCharacters("");
     writer.flush();
   }
 
-  private static void startTLS(XMLStreamWriter writer) throws Exception {
+  private static void startTLS(XMLStreamWriter writer, XMLStreamReader reader) throws Exception {
     writer.writeEmptyElement("starttls");
     writer.writeDefaultNamespace("urn:ietf:params:xml:ns:xmpp-tls");
     writer.writeCharacters("");
     writer.flush();
+
+    if((reader.next() != XMLStreamReader.START_ELEMENT) 
+      || (reader.getLocalName() != "proceed")) {
+      debugXML(reader);
+      throw new XMLStreamException("proceed not found");
+    }
+
+    if((reader.next() != XMLStreamReader.END_ELEMENT) 
+      || (reader.getLocalName() != "proceed")) {
+      throw new XMLStreamException("proceed end not found");
+    }
+
+    reader.close();
   }
   
 
