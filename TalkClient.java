@@ -13,10 +13,6 @@ public class TalkClient {
   public static final int READ_LENGTH = 512;
   public static final String jid = "deaglemetimbers";
 
-  public static final String xml_init = "<stream:stream from='deaglemetimbers@gmail.com' to='gmail.com' version='1.0' xml:lang='en' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams'>";
-  public static final String xml_starttls = "<starttls xmlns='urn:ietf:params:xml:ns:xmpp-tls'/>";
-  public static final String xml_saslauth = "<auth xmlns='urn:ietf:params:xml:ns:xmpp-sasl' mechanism='PLAIN'>";
-  public static final String xml_endstream = "</stream:stream>";
 
   public static final char BASE64EN[] = {'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z','0','1','2','3','4','5','6','7','8','9','+','/'};
   public static final int mod[] = {0,1,1};
@@ -61,7 +57,30 @@ public class TalkClient {
     while((reader.next() != XMLStreamReader.END_ELEMENT) ||
       reader.getLocalName() != "features")
     {
+      //debugXML(reader);
+    }
+  }
+  
+  private static void saslAuth(XMLStreamWriter writer, XMLStreamReader reader, 
+	char [] encodedPW) throws Exception {
+    writer.writeStartElement("auth");
+    writer.writeDefaultNamespace("urn:ietf:params:xml:ns:xmpp-sasl");
+    writer.writeAttribute("mechanism","PLAIN");
+    writer.writeCharacters(encodedPW,0,encodedPW.length);
+    writer.writeEndElement();
+    writer.flush();
+    
+    Arrays.fill(encodedPW,' ');
+
+    if((reader.next() != XMLStreamReader.START_ELEMENT) 
+      || (reader.getLocalName() != "success")) {
       debugXML(reader);
+      throw new XMLStreamException("success not found");
+    }
+
+    if((reader.next() != XMLStreamReader.END_ELEMENT) 
+      || (reader.getLocalName() != "success")) {
+      throw new XMLStreamException("success end not found");
     }
   }
 
@@ -180,13 +199,8 @@ public class TalkClient {
 	new InputStreamReader(System.in));
 
     XMLStreamWriter writer = openXMLOut(soc);
-    System.out.println("opening reader");
-    System.out.println("opened reader");
 
     System.out.println("Sending init xml\n");
-    //out.print(xml_init);
-    //out.flush();
-    //collectXMLUntil(in, "</stream:features>");
     initStream(writer);
     XMLStreamReader reader = openXMLIn(soc);
     startDoc(reader);
@@ -211,38 +225,27 @@ public class TalkClient {
 	  sslSoc.getInputStream()));
     XMLStreamWriter sslWriter = openXMLOut(sslSoc);
 
+    //Initiate new stream after TLS proceed
     System.out.println("Sending init xml tls\n");
     initStream(sslWriter);
-    //sslout.print(xml_init);
-    //sslout.flush();
-    //collectXMLUntil(sslin, "</stream:features>");
     XMLStreamReader sslReader = openXMLIn(sslSoc);
     initStream(sslReader);
     
 
     //SASL auth XMPP 6.4
     System.out.println("Sending sasl auth\n");
-    sslout.print(xml_saslauth);
-    for(int i=0; i<encodedPW.length; i++) {
-      sslout.print(encodedPW[i]);
-    }
+    saslAuth(sslWriter, sslReader, encodedPW);
     Arrays.fill(encodedPW,' ');
-    sslout.print("</auth>");
-    sslout.flush();
-    collectXMLUntil(sslin, "/>");
 
     //Initiate new stream after SASL success XMPP 6.4.6
     initStream(sslWriter);
     initStream(sslReader);
-    //collectXMLUntil(sslin, "</stream:features>");
 
     //Resource binding XMPP 7
-    bindResource(sslWriter);
-    collectXMLUntil(sslin, "</iq>");
+    bindResource(sslWriter, sslReader);
 
 
-    sslout.println(xml_endstream);
-    sslout.flush();
+    sslWriter.writeEndElement();
 
     sslin.close();
     sslout.close();
@@ -312,7 +315,10 @@ public class TalkClient {
   }
   
 
-  private static void bindResource(XMLStreamWriter writer) throws Exception {
+  private static void bindResource(XMLStreamWriter writer, XMLStreamReader reader) throws Exception {
+    String result;
+    String id,jid;
+
     writer.writeStartElement("iq");
     writer.writeAttribute("id","1");
     writer.writeAttribute("type","set");
@@ -324,6 +330,40 @@ public class TalkClient {
     writer.writeEndElement();
 
     writer.flush();
+
+    if((reader.next() != XMLStreamReader.START_ELEMENT) 
+      || (reader.getLocalName() != "iq")) {
+      throw new XMLStreamException("iq not found");
+    }
+    if((result = reader.getAttributeValue(null, "type")) == null) {
+      throw new XMLStreamException("type not found");
+    } 
+    if (!result.matches("result")) {
+      throw new XMLStreamException("type = " + result);
+    }
+
+    if((id = reader.getAttributeValue(null, "id")) == null) {
+      throw new XMLStreamException("id not found");
+    }
+    System.out.println("id is " + id);
+
+    while((reader.next() != XMLStreamReader.START_ELEMENT)
+                            || (reader.getLocalName() != "jid")) {
+      //debugXML(reader);
+    }
+
+    if(reader.next() != XMLStreamReader.CHARACTERS) {
+      debugXML(reader);
+      throw new XMLStreamException("jid not found");
+    }
+    jid = reader.getText();
+    System.out.println("jid is " + jid);
+
+    while((reader.next() != XMLStreamReader.END_ELEMENT)
+                            || (reader.getLocalName() != "iq")) {
+      //debugXML(reader);
+    }
+    debugXML(reader);
 
   }
 }
