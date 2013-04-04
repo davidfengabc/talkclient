@@ -242,7 +242,10 @@ public class TalkClient {
     initStream(sslReader);
 
     //Resource binding XMPP 7
-    bindResource(sslWriter, sslReader);
+    String resource = bindResource(sslWriter, sslReader);
+
+    sslout.println("<message from='" + resource +"' id='ktx72v49' to='david.feng7@gmail.com' type='chat' xml:lang='en'><body>Art thou not Romeo, and a Montague?</body></message>");
+    sslout.flush();
 
 
     sslWriter.writeEndElement();
@@ -315,7 +318,7 @@ public class TalkClient {
   }
   
 
-  private static void bindResource(XMLStreamWriter writer, XMLStreamReader reader) throws Exception {
+  private static String bindResource(XMLStreamWriter writer, XMLStreamReader reader) throws Exception {
     String result;
     String id,jid;
 
@@ -363,7 +366,8 @@ public class TalkClient {
                             || (reader.getLocalName() != "iq")) {
       //debugXML(reader);
     }
-    debugXML(reader);
+    //debugXML(reader);
+    return jid;
 
   }
 }
